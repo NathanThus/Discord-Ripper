@@ -3,9 +3,12 @@ const fs = require("fs");
 const path = require("path");
 const https = require("https");
 
-const TOKEN = "";
-const CHANNEL_ID = "";
-const OUTPUT_DIR = "./output";
+require("dotenv").config();
+
+const TOKEN            = process.env.TOKEN;
+const CHANNEL_ID       = process.env.CHANNEL_ID;
+const OUTPUT_DIR       = process.env.OUTPUT_DIR || "./output";
+const AFTER_MESSAGE_ID = process.env.AFTER_MESSAGE_ID || ""; // Optional: only fetch messages after this ID (exclusive)
 
 const client = new Client({
   intents: [
@@ -44,7 +47,16 @@ async function fetchAllMessages(channel) {
     const messages = await channel.messages.fetch(options);
     if (messages.size === 0) break;
 
-    allMessages.push(...messages.values());
+    if (AFTER_MESSAGE_ID) {
+      // Check if we've reached or passed the target message
+      const reachedBoundary = messages.some(m => m.id === AFTER_MESSAGE_ID);
+      const filtered = messages.filter(m => m.id > AFTER_MESSAGE_ID);
+      allMessages.push(...filtered.values());
+      if (reachedBoundary) break;
+    } else {
+      allMessages.push(...messages.values());
+    }
+
     lastId = messages.last().id;
   }
 
@@ -67,6 +79,7 @@ client.once("ready", async () => {
   }
 
   console.log("Fetching messages...");
+  if (AFTER_MESSAGE_ID) console.log(`Starting after message ID: ${AFTER_MESSAGE_ID}`);
   const messages = await fetchAllMessages(channel);
 
   let messageLog = [];
